@@ -18,14 +18,33 @@ export const generateChatCompletion = async (req, res, next) => {
         // Prepare the data as per your specified format
         const payload = {
             question: message,
-            language: "English", // Assuming the language is always Hindi, otherwise make it dynamic
-            sessionid: SESSION_ID
+            language: "English", // Assuming the language is always English, otherwise make it dynamic
+            sessionid: SESSION_ID,
         };
-        const response = await axios.post("https://0ae5-14-194-176-244.ngrok-free.app/api/v1/query", payload);
-        const chatResponse = response.data.response;
-        user.chats.push({ content: chatResponse, role: "assistant" });
+        // Send the request to both APIs
+        const [response1, response2] = await Promise.all([
+            axios.post("https://5ec8-49-37-35-65.ngrok-free.app/api/v1/text", payload),
+            axios.post("https://5ec8-49-37-35-65.ngrok-free.app/api/v1/sql", payload),
+        ]);
+        const chatResponse1 = response1.data.response;
+        const chatResponse2 = response2.data.response;
+        let finalResponse = "";
+        // Handle the cases where responses might be "NA"
+        if (chatResponse1 !== "NA")
+            finalResponse += chatResponse1;
+        if (chatResponse2 !== "NA") {
+            if (finalResponse)
+                finalResponse += " "; // Add space if there's already a response
+            finalResponse += chatResponse2;
+        }
+        if (!finalResponse) {
+            finalResponse = "I do not understand your query.";
+        }
+        user.chats.push({ content: finalResponse, role: "assistant" });
         await user.save();
-        return res.status(200).json({ sessionId: SESSION_ID, chats: user.chats });
+        return res
+            .status(200)
+            .json({ sessionId: SESSION_ID, chats: user.chats });
     }
     catch (error) {
         console.log(error);
